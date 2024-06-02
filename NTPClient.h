@@ -8,36 +8,15 @@
 #define NTP_PACKET_SIZE 48
 #define NTP_DEFAULT_LOCAL_PORT 1337
 
-
-extern "C" {
-    /*
-     * Signature for our callback functions(s)
-     */
-    typedef void (*callbackFunction)(void);
-
-    /*
-     * The time-data as a structure.
-     */
-    typedef struct  {
-        int Second;
-        int Minute;
-        int Hour;
-        int Wday;
-        int Day;
-        int Month;
-        int Year;
-    } time_data;
-}
-
-
 class NTPClient {
   private:
     UDP*          _udp;
     bool          _udpSetup       = false;
 
-    const char*   _poolServerName = "time.nist.gov"; // Default time server
-    int           _port           = NTP_DEFAULT_LOCAL_PORT;
-    int           _timeOffset     = 0;
+    const char*   _poolServerName = "pool.ntp.org"; // Default time server
+    IPAddress     _poolServerIP;
+    unsigned int  _port           = NTP_DEFAULT_LOCAL_PORT;
+    long          _timeOffset     = 0;
 
     unsigned long _updateInterval = 60000;  // In ms
 
@@ -48,33 +27,27 @@ class NTPClient {
 
     void          sendNTPPacket();
 
-    /*
-     * Callback handles.
-     */
-    callbackFunction on_before = NULL;
-    callbackFunction on_after  = NULL;
-
-    /*
-     * The current time-data
-     */
-    time_data _data;
-
   public:
     NTPClient(UDP& udp);
-    NTPClient(UDP& udp, int timeOffset);
+    NTPClient(UDP& udp, long timeOffset);
     NTPClient(UDP& udp, const char* poolServerName);
-    NTPClient(UDP& udp, const char* poolServerName, int timeOffset);
-    NTPClient(UDP& udp, const char* poolServerName, int timeOffset, unsigned long updateInterval);
+    NTPClient(UDP& udp, const char* poolServerName, long timeOffset);
+    NTPClient(UDP& udp, const char* poolServerName, long timeOffset, unsigned long updateInterval);
+    NTPClient(UDP& udp, IPAddress poolServerIP);
+    NTPClient(UDP& udp, IPAddress poolServerIP, long timeOffset);
+    NTPClient(UDP& udp, IPAddress poolServerIP, long timeOffset, unsigned long updateInterval);
 
     /**
-     * Invoke this user-function before we update.
+     * Set time server name
+     *
+     * @param poolServerName
      */
-    void on_before_update(callbackFunction newFunction);
+    void setPoolServerName(const char* poolServerName);
 
-    /**
-     * Invoke this user-function after we update.
+     /**
+     * Set random local port
      */
-    void on_after_update(callbackFunction newFunction);
+    void setRandomPort(unsigned int minValue = 49152, unsigned int maxValue = 65535);
 
     /**
      * Starts the underlying UDP client with the default local port
@@ -84,7 +57,7 @@ class NTPClient {
     /**
      * Starts the underlying UDP client with the specified local port
      */
-    void begin(int port);
+    void begin(unsigned int port);
 
     /**
      * This should be called in the main loop of your application. By default an update from the NTP Server is only
@@ -101,30 +74,17 @@ class NTPClient {
      */
     bool forceUpdate();
 
-    // Day of week
-    int getDay();
-
-    // Hour / Minute / Seconds
-    int getHours();
-    int getMinutes();
-    int getSeconds();
-
-    // The day of the month
-    int getDayOfMonth();
-
-    // The month name, as a string.
-    String getMonth( bool abbreviate = true);
-
-    // The week-day, as a string.
-    String getWeekDay(bool abbreviate = true);
-
-    // The year.
-    int getYear();
-
     /**
-     * Return the time-data as a structure.
+     * This allows to check if the NTPClient successfully received a NTP packet and set the time.
+     *
+     * @return true if time has been set, else false
      */
-    time_data parse_date_time();
+    bool isTimeSet() const;
+
+    int getDay() const;
+    int getHours() const;
+    int getMinutes() const;
+    int getSeconds() const;
 
     /**
      * Changes the time offset. Useful for changing timezones dynamically
@@ -140,12 +100,12 @@ class NTPClient {
     /**
      * @return time formatted like `hh:mm:ss`
      */
-    String getFormattedTime();
+    String getFormattedTime() const;
 
     /**
      * @return time in seconds since Jan. 1, 1970
      */
-    unsigned long getEpochTime();
+    unsigned long getEpochTime() const;
 
     /**
      * Stops the underlying UDP client
